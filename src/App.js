@@ -1,82 +1,14 @@
 import React, { useState, useEffect, useCallback } from "react";
+import { call, setToken } from "./api";
+import { C, Ico, Av, Stat, Toast, fmt } from "./ui";
+import Recruitment from "./recruitment/Recruitment";
 
-const API = "http://localhost:5000/api";
 const OFFICE_LAT = 22.8046, OFFICE_LNG = 86.2029, GEO_RADIUS = 500, SHIFT = "09:00";
-
-let token = null;
-const call = async (path, opts = {}) => {
-  const h = { "Content-Type": "application/json", ...opts.headers };
-  if (token) h["Authorization"] = `Bearer ${token}`;
-  const r = await fetch(`${API}${path}`, { ...opts, headers: h });
-  const d = await r.json();
-  if (!r.ok) throw new Error(d.error || "Error");
-  return d;
-};
 
 const dist = (a, b, c, d) => {
   const R = 6371e3, p = Math.PI / 180;
   const x = 0.5 - Math.cos((c - a) * p) / 2 + Math.cos(a * p) * Math.cos(c * p) * (1 - Math.cos((d - b) * p)) / 2;
   return R * 2 * Math.asin(Math.sqrt(x));
-};
-
-const fmt = t => {
-  if (!t) return "\u2014";
-  const [h, m] = t.slice(0, 5).split(":");
-  const hr = +h;
-  return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? "PM" : "AM"}`;
-};
-
-const ini = n => n ? n.split(" ").map(x => x[0]).join("").slice(0, 2) : "?";
-
-const C = {
-  bg: "#0B0F1A", card: "#131825", bdr: "#1E2740",
-  ok: "#4ADE80", okD: "rgba(74,222,128,0.12)", okG: "rgba(74,222,128,0.25)",
-  no: "#F87171", noD: "rgba(248,113,113,0.12)",
-  wn: "#FBBF24", wnD: "rgba(251,191,36,0.12)",
-  in: "#60A5FA", inD: "rgba(96,165,250,0.12)",
-  tx: "#F1F5F9", tm: "#94A3B8", td: "#64748B", sf: "#0F1422",
-};
-
-const Ico = ({ t, s = 20, c = "currentColor" }) => {
-  const p = {
-    mapPin: <><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0118 0z" fill="none" stroke={c} strokeWidth="1.5"/><circle cx="12" cy="10" r="3" fill="none" stroke={c} strokeWidth="1.5"/></>,
-    check: <path d="M20 6L9 17l-5-5" fill="none" stroke={c} strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"/>,
-    out: <><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4" fill="none" stroke={c} strokeWidth="1.5" strokeLinecap="round"/><path d="M16 17l5-5-5-5M21 12H9" fill="none" stroke={c} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></>,
-    users: <><path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4-4v2" fill="none" stroke={c} strokeWidth="1.5"/><circle cx="9" cy="7" r="4" fill="none" stroke={c} strokeWidth="1.5"/><path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" fill="none" stroke={c} strokeWidth="1.5"/></>,
-    alert: <><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" fill="none" stroke={c} strokeWidth="1.5"/><line x1="12" y1="9" x2="12" y2="13" stroke={c} strokeWidth="1.5" strokeLinecap="round"/><line x1="12" y1="17" x2="12.01" y2="17" stroke={c} strokeWidth="1.5" strokeLinecap="round"/></>,
-    chart: <><rect x="18" y="3" width="4" height="18" rx="1" fill="none" stroke={c} strokeWidth="1.5"/><rect x="10" y="8" width="4" height="13" rx="1" fill="none" stroke={c} strokeWidth="1.5"/><rect x="2" y="13" width="4" height="8" rx="1" fill="none" stroke={c} strokeWidth="1.5"/></>,
-    cal: <><rect x="3" y="4" width="18" height="18" rx="2" fill="none" stroke={c} strokeWidth="1.5"/><line x1="16" y1="2" x2="16" y2="6" stroke={c} strokeWidth="1.5" strokeLinecap="round"/><line x1="8" y1="2" x2="8" y2="6" stroke={c} strokeWidth="1.5" strokeLinecap="round"/><line x1="3" y1="10" x2="21" y2="10" stroke={c} strokeWidth="1.5"/></>,
-    shield: <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z" fill="none" stroke={c} strokeWidth="1.5"/>,
-    in: <><path d="M15 3h4a2 2 0 012 2v14a2 2 0 01-2 2h-4" fill="none" stroke={c} strokeWidth="1.5" strokeLinecap="round"/><path d="M10 17l5-5-5-5M15 12H3" fill="none" stroke={c} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></>,
-    ref: <><path d="M23 4v6h-6" fill="none" stroke={c} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M1 20v-6h6" fill="none" stroke={c} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/><path d="M3.51 9a9 9 0 0114.85-3.36L23 10M1 14l4.64 4.36A9 9 0 0020.49 15" fill="none" stroke={c} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round"/></>,
-  };
-  return <svg width={s} height={s} viewBox="0 0 24 24" fill="none">{p[t]}</svg>;
-};
-
-const Av = ({ n, s = 40, c = C.ok }) => (
-  <div style={{ width: s, height: s, borderRadius: "50%", background: `linear-gradient(135deg, ${c}22, ${c}44)`, border: `1.5px solid ${c}55`, display: "flex", alignItems: "center", justifyContent: "center", fontSize: s * .35, fontWeight: 600, color: c, flexShrink: 0 }}>{ini(n)}</div>
-);
-
-const Badge = ({ status }) => {
-  const m = { present: [C.ok, C.okD, "Present"], late: [C.wn, C.wnD, "Late"], absent: [C.no, C.noD, "Absent"], "on-leave": [C.in, C.inD, "On Leave"] };
-  const [c, b, l] = m[status] || m.absent;
-  return <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, color: c, background: b }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: c }} />{l}</span>;
-};
-
-const Stat = ({ icon, label, value, color, bg }) => (
-  <div style={{ background: C.card, borderRadius: 16, padding: "20px 18px", border: `1px solid ${C.bdr}`, flex: "1 1 140px", minWidth: 130 }}>
-    <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 12 }}>
-      <div style={{ width: 36, height: 36, borderRadius: 10, background: bg, display: "flex", alignItems: "center", justifyContent: "center" }}><Ico t={icon} s={18} c={color} /></div>
-      <span style={{ fontSize: 12, color: C.tm, fontWeight: 500 }}>{label}</span>
-    </div>
-    <div style={{ fontSize: 28, fontWeight: 700, color, letterSpacing: "-0.02em" }}>{value}</div>
-  </div>
-);
-
-const Toast = ({ msg, type, onClose }) => {
-  useEffect(() => { const t = setTimeout(onClose, 4000); return () => clearTimeout(t); }, [onClose]);
-  const c = type === "error" ? C.no : C.ok;
-  return <div style={{ position: "fixed", top: 20, left: "50%", transform: "translateX(-50%)", zIndex: 999, background: C.card, border: `1px solid ${c}44`, borderRadius: 14, padding: "12px 20px", color: c, fontSize: 13, fontWeight: 500, boxShadow: "0 8px 32px rgba(0,0,0,0.4)", maxWidth: "90vw" }}>{msg}</div>;
 };
 
 // ========== LOGIN ==========
@@ -90,7 +22,7 @@ const Login = ({ onLogin }) => {
     setBusy(true); setErr("");
     try {
       const d = await call("/auth/login", { method: "POST", body: JSON.stringify({ emp_id: id, password: pin }) });
-      token = d.token;
+      setToken(d.token);
       onLogin(d.employee);
     } catch (e) { setErr(e.message); }
     setBusy(false);
@@ -219,7 +151,8 @@ const Admin = ({ user, onLogout }) => {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  const tabs = [{ k: "dashboard", l: "Dashboard", i: "chart" }, { k: "attendance", l: "Attendance", i: "cal" }, { k: "alerts", l: "Alerts", i: "alert" }];
+  const tabs = [{ k: "dashboard", l: "Dashboard", i: "chart" }, { k: "attendance", l: "Attendance", i: "cal" }, { k: "alerts", l: "Alerts", i: "alert" }, { k: "hiring", l: "Hiring", i: "brief" }];
+  const notify = useCallback((msg, type = "success") => setToast({ msg, type }), []);
 
   return (
     <div style={{ minHeight: "100vh", background: C.bg, fontFamily: "'DM Sans', sans-serif", color: C.tx }}>
@@ -243,8 +176,9 @@ const Admin = ({ user, onLogout }) => {
           </button>
         ))}
       </div>
-      <div style={{ padding: 24, maxWidth: 900, margin: "0 auto" }}>
-        {loading ? <div style={{ textAlign: "center", padding: 60, color: C.tm }}>Loading...</div> : <>
+      <div style={{ padding: 24, maxWidth: tab === "hiring" ? 1280 : 900, margin: "0 auto" }}>
+        {tab === "hiring" ? <Recruitment notify={notify} />
+        : loading ? <div style={{ textAlign: "center", padding: 60, color: C.tm }}>Loading...</div> : <>
           {tab === "dashboard" && <>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 28 }}>
               <Stat icon="users" label="Total employees" value={dash.totalEmployees || 0} color={C.in} bg={C.inD} />
@@ -297,8 +231,8 @@ export default function App() {
     <>
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
       {!user ? <Login onLogin={setUser} />
-        : user.role === "admin" ? <Admin user={user} onLogout={() => { setUser(null); token = null; }} />
-        : <Employee user={user} onLogout={() => { setUser(null); token = null; }} />}
+        : user.role === "admin" ? <Admin user={user} onLogout={() => { setUser(null); setToken(null); }} />
+        : <Employee user={user} onLogout={() => { setUser(null); setToken(null); }} />}
     </>
   );
 }
