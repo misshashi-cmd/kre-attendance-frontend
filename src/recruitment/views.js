@@ -1,20 +1,8 @@
 import React, { useState } from "react";
-import { C, Ico, Av, Stat, Btn, Card, inp, fmt } from "../ui";
+import { C, Ico, Av, Stat, Btn, Card, Bar, Row, inp, fmt } from "../ui";
 import { today, addDays, daysBetween, moveStage } from "./store";
 import { STAGES, ACTIVE, stageOf, JOB_STATUS, RESULTS, OFFER_STATUS, Pill, Stars, Empty, SectionTitle, inr, dfmt, copyText } from "./common";
 import { jobPostText } from "./modals";
-
-const Bar = ({ label, value, max, c }) => (
-  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, fontSize: 12 }}>
-    <span style={{ width: 110, color: C.tm, flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
-    <div style={{ flex: 1, height: 10, background: C.sf, borderRadius: 6, overflow: "hidden" }}><div style={{ width: `${max ? (value / max) * 100 : 0}%`, height: "100%", background: c, borderRadius: 6 }} /></div>
-    <span style={{ width: 28, textAlign: "right", fontWeight: 600 }}>{value}</span>
-  </div>
-);
-
-const Row = ({ children, onClick, style }) => (
-  <div onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", background: C.sf, borderRadius: 12, border: `1px solid ${C.bdr}`, marginBottom: 8, cursor: onClick ? "pointer" : "default", ...style }}>{children}</div>
-);
 
 const DateChip = ({ iso }) => {
   const d = new Date(`${iso}T00:00:00`);

@@ -1,4 +1,4 @@
-import React, { useEffect } from "react";
+import React, { useState, useEffect } from "react";
 
 export const fmt = t => {
   if (!t) return "—";
@@ -47,6 +47,9 @@ export const Ico = ({ t, s = 20, c = "currentColor" }) => {
     search: <><circle cx="11" cy="11" r="8" {...k}/><path d="M21 21l-4.35-4.35" {...k}/></>,
     copy: <><rect x="9" y="9" width="13" height="13" rx="2" {...k}/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1" {...k}/></>,
     print: <><path d="M6 9V2h12v7M6 18H4a2 2 0 01-2-2v-5a2 2 0 012-2h16a2 2 0 012 2v5a2 2 0 01-2 2h-2" {...k}/><rect x="6" y="14" width="12" height="8" {...k}/></>,
+    funnel: <path d="M22 3H2l8 9.46V19l4 2v-8.54L22 3z" {...k}/>,
+    chat: <path d="M21 11.5a8.38 8.38 0 01-.9 3.8 8.5 8.5 0 01-7.6 4.7 8.38 8.38 0 01-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 01-.9-3.8 8.5 8.5 0 014.7-7.6 8.38 8.38 0 013.8-.9h.5a8.48 8.48 0 018 8v.5z" {...k}/>,
+    upload: <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12" {...k}/>,
     link: <><path d="M10 13a5 5 0 007.54.54l3-3a5 5 0 00-7.07-7.07l-1.72 1.71" {...k}/><path d="M14 11a5 5 0 00-7.54-.54l-3 3a5 5 0 007.07 7.07l1.71-1.71" {...k}/></>,
   };
   return <svg width={s} height={s} viewBox="0 0 24 24" fill="none">{p[t]}</svg>;
@@ -123,3 +126,82 @@ export const Modal = ({ title, onClose, footer, w = 600, children }) => {
     </div>
   );
 };
+
+// ---------- form state helpers ----------
+export const useForm = init => {
+  const [f, setF] = useState(init);
+  const on = k => e => setF(p => ({ ...p, [k]: e.target.value }));
+  return [f, setF, on];
+};
+export const num = v => v === "" || v === undefined || v === null ? "" : Number(v);
+export const Opts = ({ list }) => list.map(o => Array.isArray(o) ? <option key={o[0]} value={o[0]}>{o[1]}</option> : <option key={o} value={o}>{o}</option>);
+
+// Wraps a save so the modal stays open (and shows the error) if the backend rejects it.
+export const useSubmit = (notify, onClose) => {
+  const [busy, setBusy] = useState(false);
+  const run = async (fn, msg) => {
+    setBusy(true);
+    try { await fn(); if (msg) notify(msg); onClose(); }
+    catch (e) { notify(e.message, "error"); }
+    setBusy(false);
+  };
+  return [busy, run];
+};
+
+// ---------- shared display helpers ----------
+export const inr = n => n === "" || n === null || n === undefined || isNaN(n) ? "—" : `₹${Number(n).toLocaleString("en-IN")}`;
+
+export const dfmt = iso => iso ? new Date(`${iso}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—";
+
+export const Pill = ({ c, children }) => (
+  <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: 20, fontSize: 11, fontWeight: 600, color: c, background: `${c}1F`, whiteSpace: "nowrap" }}>
+    <span style={{ width: 6, height: 6, borderRadius: "50%", background: c }} />{children}
+  </span>
+);
+
+export const Empty = ({ icon, title, sub, children }) => (
+  <div style={{ textAlign: "center", padding: "48px 20px", color: C.tm }}>
+    <Ico t={icon} s={36} c={C.td} />
+    <div style={{ fontSize: 14, fontWeight: 600, color: C.tx, marginTop: 12 }}>{title}</div>
+    {sub && <div style={{ fontSize: 12, marginTop: 4 }}>{sub}</div>}
+    {children && <div style={{ marginTop: 16, display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>{children}</div>}
+  </div>
+);
+
+export const SectionTitle = ({ children, right }) => (
+  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 10, flexWrap: "wrap" }}>
+    <span style={{ fontSize: 12, fontWeight: 600, color: C.tm, textTransform: "uppercase", letterSpacing: ".05em" }}>{children}</span>
+    {right}
+  </div>
+);
+
+export const copyText = async text => {
+  try { await navigator.clipboard.writeText(text); return true; }
+  catch {
+    const t = document.createElement("textarea");
+    t.value = text; document.body.appendChild(t); t.select();
+    const ok = document.execCommand("copy");
+    t.remove(); return ok;
+  }
+};
+
+export const downloadCsv = (name, rows) => {
+  const esc = v => { const s = v === null || v === undefined ? "" : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
+  const csv = rows.map(r => r.map(esc).join(",")).join("\n");
+  const a = document.createElement("a");
+  a.href = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
+  a.download = name; a.click();
+  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
+};
+
+export const Bar = ({ label, value, max, c }) => (
+  <div style={{ display: "flex", alignItems: "center", gap: 10, marginBottom: 8, fontSize: 12 }}>
+    <span style={{ width: 110, color: C.tm, flexShrink: 0, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+    <div style={{ flex: 1, height: 10, background: C.sf, borderRadius: 6, overflow: "hidden" }}><div style={{ width: `${max ? (value / max) * 100 : 0}%`, height: "100%", background: c, borderRadius: 6 }} /></div>
+    <span style={{ width: 28, textAlign: "right", fontWeight: 600 }}>{value}</span>
+  </div>
+);
+
+export const Row = ({ children, onClick, style }) => (
+  <div onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", background: C.sf, borderRadius: 12, border: `1px solid ${C.bdr}`, marginBottom: 8, cursor: onClick ? "pointer" : "default", ...style }}>{children}</div>
+);

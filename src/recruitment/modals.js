@@ -1,27 +1,7 @@
-import React, { useState, useRef } from "react";
-import { C, Ico, Btn, Modal, Field, Grid, inp } from "../ui";
+import React, { useRef } from "react";
+import { C, Ico, Btn, Modal, Field, Grid, inp, useForm, useSubmit, num, Opts } from "../ui";
 import { today, addDays, moveStage } from "./store";
 import { STAGES, JOB_STATUS, RESULTS, OFFER_STATUS, SOURCES, ROUNDS, MODES, EMP_TYPES, ONBOARDING, Pill, Stars, SectionTitle, inr, dfmt, gcalLink } from "./common";
-
-const useForm = init => {
-  const [f, setF] = useState(init);
-  const on = k => e => setF(p => ({ ...p, [k]: e.target.value }));
-  return [f, setF, on];
-};
-const num = v => v === "" || v === undefined || v === null ? "" : Number(v);
-const Opts = ({ list }) => list.map(o => Array.isArray(o) ? <option key={o[0]} value={o[0]}>{o[1]}</option> : <option key={o} value={o}>{o}</option>);
-
-// Wraps a save so the modal stays open (and shows the error) if the backend rejects it.
-const useSubmit = (notify, onClose) => {
-  const [busy, setBusy] = useState(false);
-  const run = async (fn, msg) => {
-    setBusy(true);
-    try { await fn(); if (msg) notify(msg); onClose(); }
-    catch (e) { notify(e.message, "error"); }
-    setBusy(false);
-  };
-  return [busy, run];
-};
 
 // ========== JOB ==========
 export const JobModal = ({ job, candidates, save, remove, notify, onClose }) => {

@@ -1,6 +1,8 @@
 import React from "react";
 import { C, Ico } from "../ui";
 
+export { Pill, Empty, SectionTitle, inr, dfmt, copyText, downloadCsv } from "../ui";
+
 export const STAGES = [
   { k: "applied", l: "Applied", sh: "Applied", c: C.tm },
   { k: "screening", l: "Screening", sh: "Screen", c: C.in },
@@ -31,15 +33,6 @@ export const ONBOARDING = [
   "Induction / orientation done",
 ];
 
-export const inr = n => n === "" || n === null || n === undefined || isNaN(n) ? "—" : `₹${Number(n).toLocaleString("en-IN")}`;
-export const dfmt = iso => iso ? new Date(`${iso}T00:00:00`).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" }) : "—";
-
-export const Pill = ({ c, children }) => (
-  <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "3px 9px", borderRadius: 20, fontSize: 11, fontWeight: 600, color: c, background: `${c}1F`, whiteSpace: "nowrap" }}>
-    <span style={{ width: 6, height: 6, borderRadius: "50%", background: c }} />{children}
-  </span>
-);
-
 export const Stars = ({ v = 0, onChange, s = 14 }) => (
   <span style={{ display: "inline-flex", gap: 2 }}>
     {[1, 2, 3, 4, 5].map(i => (
@@ -50,40 +43,6 @@ export const Stars = ({ v = 0, onChange, s = 14 }) => (
   </span>
 );
 
-export const Empty = ({ icon, title, sub, children }) => (
-  <div style={{ textAlign: "center", padding: "48px 20px", color: C.tm }}>
-    <Ico t={icon} s={36} c={C.td} />
-    <div style={{ fontSize: 14, fontWeight: 600, color: C.tx, marginTop: 12 }}>{title}</div>
-    {sub && <div style={{ fontSize: 12, marginTop: 4 }}>{sub}</div>}
-    {children && <div style={{ marginTop: 16, display: "flex", gap: 8, justifyContent: "center", flexWrap: "wrap" }}>{children}</div>}
-  </div>
-);
-
-export const SectionTitle = ({ children, right }) => (
-  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 12, gap: 10, flexWrap: "wrap" }}>
-    <span style={{ fontSize: 12, fontWeight: 600, color: C.tm, textTransform: "uppercase", letterSpacing: ".05em" }}>{children}</span>
-    {right}
-  </div>
-);
-
-export const copyText = async text => {
-  try { await navigator.clipboard.writeText(text); return true; }
-  catch {
-    const t = document.createElement("textarea");
-    t.value = text; document.body.appendChild(t); t.select();
-    const ok = document.execCommand("copy");
-    t.remove(); return ok;
-  }
-};
-
-export const downloadCsv = (name, rows) => {
-  const esc = v => { const s = v === null || v === undefined ? "" : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; };
-  const csv = rows.map(r => r.map(esc).join(",")).join("\n");
-  const a = document.createElement("a");
-  a.href = URL.createObjectURL(new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8" }));
-  a.download = name; a.click();
-  setTimeout(() => URL.revokeObjectURL(a.href), 1000);
-};
 
 // Google Calendar "add event" link — no API access needed, opens pre-filled in the browser.
 export const gcalLink = ({ title, date, time, duration = 30, details = "", location = "" }) => {

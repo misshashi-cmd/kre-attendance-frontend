@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { call, setToken } from "./api";
 import { C, Ico, Av, Stat, Toast, fmt } from "./ui";
 import Recruitment from "./recruitment/Recruitment";
+import Crm from "./crm/Crm";
 
 const OFFICE_LAT = 22.8046, OFFICE_LNG = 86.2029, GEO_RADIUS = 500, SHIFT = "09:00";
 
@@ -151,7 +152,7 @@ const Admin = ({ user, onLogout }) => {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  const tabs = [{ k: "dashboard", l: "Dashboard", i: "chart" }, { k: "attendance", l: "Attendance", i: "cal" }, { k: "alerts", l: "Alerts", i: "alert" }, { k: "hiring", l: "Hiring", i: "brief" }];
+  const tabs = [{ k: "dashboard", l: "Dashboard", i: "chart" }, { k: "attendance", l: "Attendance", i: "cal" }, { k: "alerts", l: "Alerts", i: "alert" }, { k: "hiring", l: "Hiring", i: "brief" }, { k: "crm", l: "Leads", i: "funnel" }];
   const notify = useCallback((msg, type = "success") => setToast({ msg, type }), []);
 
   return (
@@ -176,8 +177,9 @@ const Admin = ({ user, onLogout }) => {
           </button>
         ))}
       </div>
-      <div style={{ padding: 24, maxWidth: tab === "hiring" ? 1280 : 900, margin: "0 auto" }}>
+      <div style={{ padding: 24, maxWidth: ["hiring", "crm"].includes(tab) ? 1280 : 900, margin: "0 auto" }}>
         {tab === "hiring" ? <Recruitment notify={notify} />
+        : tab === "crm" ? <Crm notify={notify} user={user} />
         : loading ? <div style={{ textAlign: "center", padding: 60, color: C.tm }}>Loading...</div> : <>
           {tab === "dashboard" && <>
             <div style={{ display: "flex", flexWrap: "wrap", gap: 14, marginBottom: 28 }}>

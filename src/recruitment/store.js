@@ -1,31 +1,11 @@
-import { useState, useEffect, useCallback } from "react";
-import { call } from "../api";
+import { useCallback } from "react";
+import { useCollections, uid, today, addDays } from "../collections";
 
-/*
- * Recruitment data layer.
- *
- * Talks to the backend when it exposes these routes (all JSON, same auth as the rest of the API):
- *   GET    /api/recruitment/:col        -> { [col]: [...] }
- *   POST   /api/recruitment/:col        -> { item }   (body is the full record, id included)
- *   PUT    /api/recruitment/:col/:id    -> { item }
- *   DELETE /api/recruitment/:col/:id    -> {}
- * where :col is one of jobs | candidates | interviews.
- *
- * If those routes are missing, it falls back to this browser's localStorage so the
- * module is usable straight away (data then lives only on this device).
- */
+// Recruitment data: /api/recruitment/{jobs,candidates,interviews}, or localStorage
+// when the backend doesn't have those routes (see collections.js).
+export { uid, today, addDays, daysBetween } from "../collections";
 
-const KEY = "kre_recruitment_v1";
 const COLS = ["jobs", "candidates", "interviews"];
-const blank = () => ({ jobs: [], candidates: [], interviews: [] });
-
-const readLocal = () => { try { return { ...blank(), ...JSON.parse(localStorage.getItem(KEY) || "{}") }; } catch { return blank(); } };
-const writeLocal = d => { try { localStorage.setItem(KEY, JSON.stringify(d)); } catch {} };
-
-export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
-export const today = () => new Date().toLocaleDateString("en-CA"); // local YYYY-MM-DD
-export const addDays = (iso, n) => { const d = new Date(`${iso}T00:00:00`); d.setDate(d.getDate() + n); return d.toLocaleDateString("en-CA"); };
-export const daysBetween = (a, b) => Math.round((new Date(`${b}T00:00:00`) - new Date(`${a}T00:00:00`)) / 864e5);
 
 // Returns the candidate moved to `stage`, recording when it happened.
 export const moveStage = (c, stage) => c.stage === stage ? c : {
@@ -35,41 +15,7 @@ export const moveStage = (c, stage) => c.stage === stage ? c : {
 };
 
 export const useRecruitment = () => {
-  const [data, setData] = useState(blank);
-  const [mode, setMode] = useState(null); // "api" | "local"
-  const [loading, setLoading] = useState(true);
-
-  const load = useCallback(async () => {
-    setLoading(true);
-    try {
-      const res = await Promise.all(COLS.map(c => call(`/recruitment/${c}`)));
-      setData(Object.fromEntries(COLS.map((c, i) => [c, res[i][c] || []])));
-      setMode("api");
-    } catch {
-      setData(readLocal());
-      setMode("local");
-    }
-    setLoading(false);
-  }, []);
-  useEffect(() => { load(); }, [load]);
-
-  useEffect(() => { if (mode === "local") writeLocal(data); }, [mode, data]);
-
-  const save = useCallback(async (col, item) => {
-    const isNew = !item.id;
-    let rec = isNew ? { ...item, id: uid(), created_on: today() } : item;
-    if (mode === "api") {
-      const r = await call(isNew ? `/recruitment/${col}` : `/recruitment/${col}/${rec.id}`, { method: isNew ? "POST" : "PUT", body: JSON.stringify(rec) });
-      rec = r.item || rec;
-    }
-    setData(d => ({ ...d, [col]: isNew ? [...d[col], rec] : d[col].map(x => x.id === rec.id ? rec : x) }));
-    return rec;
-  }, [mode]);
-
-  const remove = useCallback(async (col, id) => {
-    if (mode === "api") await call(`/recruitment/${col}/${id}`, { method: "DELETE" });
-    setData(d => ({ ...d, [col]: d[col].filter(x => x.id !== id) }));
-  }, [mode]);
+  const { data, setData, mode, loading, load, save, remove } = useCollections("recruitment", COLS, "kre_recruitment_v1");
 
   // Demo data so HR can try the tools before real candidates arrive (local mode only).
   const seed = useCallback(() => {
@@ -95,7 +41,7 @@ export const useRecruitment = () => {
         { id: uid(), candidate_id: cands[3].id, round: "Technical", date: addDays(t, -2), time: "15:00", duration: 45, interviewer: "Operations Head", mode: "Video", venue: "", result: "selected", rating: 5, feedback: "Strong hands-on experience with dispatch.", created_on: addDays(t, -4) },
       ],
     });
-  }, []);
+  }, [setData]);
 
   return { data, mode, loading, load, save, remove, seed };
 };
