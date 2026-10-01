@@ -231,8 +231,8 @@ const Admin = ({ user, onLogout }) => {
   );
 };
 
-// ========== HR (hiring only) ==========
-const Hr = ({ user, onLogout }) => {
+// ========== SINGLE-TOOL STAFF (HR → Hiring, Sales → Leads) ==========
+const Workspace = ({ user, onLogout, icon, label, children }) => {
   const [toast, setToast] = useState(null);
   const notify = useCallback((msg, type = "success") => setToast({ msg, type }), []);
   return (
@@ -240,15 +240,15 @@ const Hr = ({ user, onLogout }) => {
       {toast && <Toast msg={toast.msg} type={toast.type} onClose={() => setToast(null)} />}
       <div style={{ padding: "16px 24px", display: "flex", justifyContent: "space-between", alignItems: "center", borderBottom: `1px solid ${C.bdr}`, background: C.card }}>
         <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
-          <div style={{ width: 36, height: 36, borderRadius: 10, background: `linear-gradient(135deg, ${C.ok}, #22D3EE)`, display: "flex", alignItems: "center", justifyContent: "center" }}><Ico t="brief" s={18} c="#0B0F1A" /></div>
-          <div><div style={{ fontSize: 16, fontWeight: 700 }}>KRE Group</div><div style={{ fontSize: 11, color: C.tm }}>HR — Hiring</div></div>
+          <div style={{ width: 36, height: 36, borderRadius: 10, background: `linear-gradient(135deg, ${C.ok}, #22D3EE)`, display: "flex", alignItems: "center", justifyContent: "center" }}><Ico t={icon} s={18} c="#0B0F1A" /></div>
+          <div><div style={{ fontSize: 16, fontWeight: 700 }}>KRE Group</div><div style={{ fontSize: 11, color: C.tm }}>{label}</div></div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           <Av n={user.name} s={34} />
           <button onClick={onLogout} title="Log out" style={{ background: C.sf, border: `1px solid ${C.bdr}`, borderRadius: 10, padding: "7px 12px", color: C.tm, cursor: "pointer", fontSize: 12 }}><Ico t="out" s={14} c={C.tm} /></button>
         </div>
       </div>
-      <div style={{ padding: 24, maxWidth: 1280, margin: "0 auto" }}><Recruitment notify={notify} /></div>
+      <div style={{ padding: 24, maxWidth: 1280, margin: "0 auto" }}>{children(notify)}</div>
     </div>
   );
 };
@@ -261,7 +261,8 @@ export default function App() {
       <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=Playfair+Display:wght@600;700&display=swap" rel="stylesheet" />
       {!user ? <Login onLogin={setUser} />
         : user.role === "admin" ? <Admin user={user} onLogout={() => { setUser(null); setToken(null); }} />
-        : user.role === "hr" ? <Hr user={user} onLogout={() => { setUser(null); setToken(null); }} />
+        : user.role === "hr" ? <Workspace user={user} onLogout={() => { setUser(null); setToken(null); }} icon="brief" label="HR — Hiring">{notify => <Recruitment notify={notify} />}</Workspace>
+        : user.role === "sales" ? <Workspace user={user} onLogout={() => { setUser(null); setToken(null); }} icon="funnel" label="Sales — Leads">{notify => <Crm notify={notify} user={user} />}</Workspace>
         : <Employee user={user} onLogout={() => { setUser(null); setToken(null); }} />}
     </>
   );

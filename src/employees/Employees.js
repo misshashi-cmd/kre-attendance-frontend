@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from "react";
 import { call } from "../api";
 import { C, Ico, Av, Btn, Card, Modal, Field, Grid, inp, useForm, Opts, Pill, Empty, copyText } from "../ui";
 
-const ROLES = { employee: [C.tm, "Employee"], hr: [C.wn, "HR (Hiring only)"], manager: [C.in, "Manager"], admin: [C.pu, "Admin"] };
+const ROLES = { employee: [C.tm, "Employee"], hr: [C.wn, "HR (Hiring only)"], sales: [C.ok, "Sales (Leads only)"], manager: [C.in, "Manager"], admin: [C.pu, "Admin"] };
 const randomPin = () => String(Math.floor(1000 + Math.random() * 9000));
 
 // ========== ADD / EDIT ==========
@@ -78,6 +78,7 @@ const EmployeeModal = ({ emp, employees, me, notify, onSaved, onClose }) => {
       </Grid>
       {f.role === "admin" && <div style={{ marginTop: 12, fontSize: 12, color: C.wn, background: C.wnD, padding: "8px 12px", borderRadius: 10 }}>Admins can see all attendance, hiring and sales data, and manage employees.</div>}
       {f.role === "hr" && <div style={{ marginTop: 12, fontSize: 12, color: C.tm, background: C.sf, border: `1px solid ${C.bdr}`, padding: "8px 12px", borderRadius: 10 }}>HR sees only the Hiring tab: jobs, candidates, interviews and offers. No attendance, leads or employee list, and no check-in button.</div>}
+      {f.role === "sales" && <div style={{ marginTop: 12, fontSize: 12, color: C.tm, background: C.sf, border: `1px solid ${C.bdr}`, padding: "8px 12px", borderRadius: 10 }}>Sales sees only the Leads tab: all leads, pipeline, follow-ups and activity. No attendance, hiring or employee list, and no check-in button.</div>}
     </Modal>
   );
 };
