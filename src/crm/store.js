@@ -16,7 +16,7 @@ export const moveStage = (l, stage) => l.stage === stage ? l : {
 };
 
 export const useCrm = () => {
-  const { data, setData, mode, loading, load, save, remove } = useCollections("crm", COLS, "kre_crm_v1");
+  const { data, setData, mode, error, loading, load, save, remove } = useCollections("crm", COLS, "kre_crm_v1");
 
   // Demo data so the sales team can try the tools before entering real leads (local mode only).
   const seed = useCallback(() => {
@@ -49,5 +49,5 @@ export const useCrm = () => {
     });
   }, [setData]);
 
-  return { data, mode, loading, load, save, remove, seed };
+  return { data, mode, error, loading, load, save, remove, seed };
 };

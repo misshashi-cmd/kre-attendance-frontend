@@ -3,6 +3,7 @@ import { call, setToken } from "./api";
 import { C, Ico, Av, Stat, Toast, fmt } from "./ui";
 import Recruitment from "./recruitment/Recruitment";
 import Crm from "./crm/Crm";
+import Employees from "./employees/Employees";
 
 const OFFICE_LAT = 22.8046, OFFICE_LNG = 86.2029, GEO_RADIUS = 500, SHIFT = "09:00";
 
@@ -10,6 +11,12 @@ const dist = (a, b, c, d) => {
   const R = 6371e3, p = Math.PI / 180;
   const x = 0.5 - Math.cos((c - a) * p) / 2 + Math.cos(a * p) * Math.cos(c * p) * (1 - Math.cos((d - b) * p)) / 2;
   return R * 2 * Math.asin(Math.sqrt(x));
+};
+
+const Badge = ({ status }) => {
+  const m = { present: [C.ok, C.okD, "Present"], late: [C.wn, C.wnD, "Late"], absent: [C.no, C.noD, "Absent"], "on-leave": [C.in, C.inD, "On Leave"] };
+  const [c, b, l] = m[status] || m.absent;
+  return <span style={{ display: "inline-flex", alignItems: "center", gap: 5, padding: "4px 10px", borderRadius: 20, fontSize: 11, fontWeight: 600, color: c, background: b }}><span style={{ width: 6, height: 6, borderRadius: "50%", background: c }} />{l}</span>;
 };
 
 // ========== LOGIN ==========
@@ -44,15 +51,12 @@ const Login = ({ onLogin }) => {
           </div>
           <div>
             <label style={{ fontSize: 12, fontWeight: 500, color: C.tm, marginBottom: 6, display: "block" }}>PIN</label>
-            <input value={pin} onChange={e => setPin(e.target.value)} type="password" placeholder="4-digit PIN" onKeyDown={e => e.key === "Enter" && go()} style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: `1px solid ${C.bdr}`, background: C.sf, color: C.tx, fontSize: 14, outline: "none", boxSizing: "border-box" }} />
+            <input value={pin} onChange={e => setPin(e.target.value)} type="password" placeholder="Your PIN" onKeyDown={e => e.key === "Enter" && go()} style={{ width: "100%", padding: "12px 14px", borderRadius: 12, border: `1px solid ${C.bdr}`, background: C.sf, color: C.tx, fontSize: 14, outline: "none", boxSizing: "border-box" }} />
           </div>
           {err && <div style={{ color: C.no, fontSize: 13, textAlign: "center", padding: "8px 12px", background: C.noD, borderRadius: 10 }}>{err}</div>}
           <button onClick={go} disabled={busy} style={{ width: "100%", padding: "13px 0", borderRadius: 12, border: "none", background: `linear-gradient(135deg, ${C.ok}, #22D3EE)`, color: "#0B0F1A", fontSize: 15, fontWeight: 700, cursor: "pointer", marginTop: 8, opacity: busy ? 0.7 : 1 }}>{busy ? "Signing in..." : "Sign In"}</button>
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginTop: 20, padding: "10px 14px", background: C.sf, borderRadius: 10, border: `1px solid ${C.bdr}` }}>
-          <div style={{ width: 8, height: 8, borderRadius: "50%", background: C.ok, boxShadow: `0 0 8px ${C.ok}` }} /><span style={{ fontSize: 11, color: C.tm }}>Connected to API at localhost:5000</span>
-        </div>
-        <p style={{ fontSize: 11, color: C.td, textAlign: "center", marginTop: 12 }}>Admin: ID 1 / PIN 1234 | Employee: ID 2 / PIN 2345</p>
+        <p style={{ fontSize: 11, color: C.td, textAlign: "center", marginTop: 20 }}>Forgot your PIN? Ask your admin to reset it.</p>
       </div>
     </div>
   );
@@ -152,7 +156,7 @@ const Admin = ({ user, onLogout }) => {
   }, []);
   useEffect(() => { load(); }, [load]);
 
-  const tabs = [{ k: "dashboard", l: "Dashboard", i: "chart" }, { k: "attendance", l: "Attendance", i: "cal" }, { k: "alerts", l: "Alerts", i: "alert" }, { k: "hiring", l: "Hiring", i: "brief" }, { k: "crm", l: "Leads", i: "funnel" }];
+  const tabs = [{ k: "dashboard", l: "Dashboard", i: "chart" }, { k: "attendance", l: "Attendance", i: "cal" }, { k: "alerts", l: "Alerts", i: "alert" }, { k: "employees", l: "Employees", i: "users" }, { k: "hiring", l: "Hiring", i: "brief" }, { k: "crm", l: "Leads", i: "funnel" }];
   const notify = useCallback((msg, type = "success") => setToast({ msg, type }), []);
 
   return (
@@ -178,7 +182,8 @@ const Admin = ({ user, onLogout }) => {
         ))}
       </div>
       <div style={{ padding: 24, maxWidth: ["hiring", "crm"].includes(tab) ? 1280 : 900, margin: "0 auto" }}>
-        {tab === "hiring" ? <Recruitment notify={notify} />
+        {tab === "employees" ? <Employees notify={notify} user={user} />
+        : tab === "hiring" ? <Recruitment notify={notify} />
         : tab === "crm" ? <Crm notify={notify} user={user} />
         : loading ? <div style={{ textAlign: "center", padding: 60, color: C.tm }}>Loading...</div> : <>
           {tab === "dashboard" && <>

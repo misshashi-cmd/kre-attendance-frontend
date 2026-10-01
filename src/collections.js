@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from "react";
-import { call } from "./api";
+import { call, ONLINE } from "./api";
 
 /*
  * Shared data layer for modules that store simple record collections (Hiring, CRM).
@@ -10,8 +10,9 @@ import { call } from "./api";
  *   PUT    /api/<base>/:col/:id    -> { item }
  *   DELETE /api/<base>/:col/:id    -> {}
  *
- * If those routes are missing, it falls back to this browser's localStorage so the
- * module is usable straight away (data then lives only on this device).
+ * During local development (no REACT_APP_API_URL), if those routes are missing it falls
+ * back to this browser's localStorage so the module is usable straight away. The online
+ * build never does: it reports the error instead, so nobody's work stays on one device.
  */
 
 export const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
@@ -22,7 +23,8 @@ export const daysBetween = (a, b) => Math.round((new Date(`${b}T00:00:00`) - new
 export const useCollections = (base, cols, storageKey) => {
   const blank = useCallback(() => Object.fromEntries(cols.map(c => [c, []])), [cols]);
   const [data, setData] = useState(blank);
-  const [mode, setMode] = useState(null); // "api" | "local"
+  const [mode, setMode] = useState(null); // "api" | "local" | "error"
+  const [error, setError] = useState("");
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -31,7 +33,14 @@ export const useCollections = (base, cols, storageKey) => {
       const res = await Promise.all(cols.map(c => call(`/${base}/${c}`)));
       setData(Object.fromEntries(cols.map((c, i) => [c, res[i][c] || []])));
       setMode("api");
-    } catch {
+      setError("");
+    } catch (e) {
+      if (ONLINE) {
+        setError(e.message);
+        setMode("error");
+        setLoading(false);
+        return;
+      }
       let saved = {};
       try { saved = JSON.parse(localStorage.getItem(storageKey) || "{}"); } catch {}
       setData({ ...blank(), ...saved });
@@ -46,6 +55,7 @@ export const useCollections = (base, cols, storageKey) => {
   }, [mode, data, storageKey]);
 
   const save = useCallback(async (col, item) => {
+    if (mode !== "api" && mode !== "local") throw new Error("Not connected to the server. Press Refresh and try again.");
     const isNew = !item.id;
     let rec = isNew ? { ...item, id: uid(), created_on: today() } : item;
     if (mode === "api") {
@@ -57,9 +67,10 @@ export const useCollections = (base, cols, storageKey) => {
   }, [base, mode]);
 
   const remove = useCallback(async (col, id) => {
+    if (mode !== "api" && mode !== "local") throw new Error("Not connected to the server. Press Refresh and try again.");
     if (mode === "api") await call(`/${base}/${col}/${id}`, { method: "DELETE" });
     setData(d => ({ ...d, [col]: d[col].filter(x => x.id !== id) }));
   }, [base, mode]);
 
-  return { data, setData, mode, loading, load, save, remove };
+  return { data, setData, mode, error, loading, load, save, remove };
 };
