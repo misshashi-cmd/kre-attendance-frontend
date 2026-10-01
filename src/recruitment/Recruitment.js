@@ -14,7 +14,7 @@ const TABS = [
 ];
 
 export default function Recruitment({ notify }) {
-  const { data, mode, loading, load, save, remove, seed } = useRecruitment();
+  const { data, mode, error, loading, load, save, remove, seed } = useRecruitment();
   const [tab, setTab] = useState("overview");
   const [modal, setModal] = useState(null); // { type: "job" | "cand" | "iv" | "offer", item }
   const [jobFilter, setJobFilter] = useState("");
@@ -40,8 +40,8 @@ export default function Recruitment({ notify }) {
         <div>
           <div style={{ fontSize: 20, fontWeight: 700 }}>Hiring & Recruitment</div>
           <div style={{ fontSize: 12, color: C.tm, marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 7, height: 7, borderRadius: "50%", background: mode === "api" ? C.ok : C.wn }} />
-            {mode === "api" ? "Synced with server" : mode === "local" ? "Saved on this device only — backend recruitment API not found" : "Connecting…"}
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: mode === "api" ? C.ok : mode === "error" ? C.no : C.wn }} />
+            {mode === "api" ? "Synced with server" : mode === "local" ? "Saved on this device only — backend recruitment API not found" : mode === "error" ? "Not connected to the server" : "Connecting…"}
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -62,6 +62,11 @@ export default function Recruitment({ notify }) {
       </div>
 
       {loading ? <div style={{ textAlign: "center", padding: 60, color: C.tm }}>Loading...</div>
+      : mode === "error" ? (
+        <Card><Empty icon="alert" title="Can't reach the server" sub={`${error} Check your internet connection, then press Refresh.`}>
+          <Btn kind="primary" icon="ref" onClick={load}>Refresh</Btn>
+        </Empty></Card>
+      )
       : !data.jobs.length && !data.candidates.length ? (
         <Card><Empty icon="brief" title="Start hiring" sub="Create a job opening, add candidates, schedule interviews and send offer letters — all in one place.">
           <Btn kind="primary" icon="plus" onClick={() => open("job")}>Create first job opening</Btn>

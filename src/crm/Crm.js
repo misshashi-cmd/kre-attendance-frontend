@@ -6,7 +6,7 @@ import { LeadModal, ActivityModal, ImportModal } from "./modals";
 import { Overview, Pipeline, Leads, FollowUps } from "./views";
 
 export default function Crm({ notify, user }) {
-  const { data, mode, loading, load, save, remove, seed } = useCrm();
+  const { data, mode, error, loading, load, save, remove, seed } = useCrm();
   const [tab, setTab] = useState("overview");
   const [modal, setModal] = useState(null); // { type: "lead" | "act" | "import", item }
 
@@ -39,8 +39,8 @@ export default function Crm({ notify, user }) {
         <div>
           <div style={{ fontSize: 20, fontWeight: 700 }}>Sales Leads</div>
           <div style={{ fontSize: 12, color: C.tm, marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
-            <span style={{ width: 7, height: 7, borderRadius: "50%", background: mode === "api" ? C.ok : C.wn }} />
-            {mode === "api" ? "Synced with server" : mode === "local" ? "Saved on this device only — backend CRM API not found" : "Connecting…"}
+            <span style={{ width: 7, height: 7, borderRadius: "50%", background: mode === "api" ? C.ok : mode === "error" ? C.no : C.wn }} />
+            {mode === "api" ? "Synced with server" : mode === "local" ? "Saved on this device only — backend CRM API not found" : mode === "error" ? "Not connected to the server" : "Connecting…"}
           </div>
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
@@ -62,6 +62,11 @@ export default function Crm({ notify, user }) {
       </div>
 
       {loading ? <div style={{ textAlign: "center", padding: 60, color: C.tm }}>Loading...</div>
+      : mode === "error" ? (
+        <Card><Empty icon="alert" title="Can't reach the server" sub={`${error} Check your internet connection, then press Refresh.`}>
+          <Btn kind="primary" icon="ref" onClick={load}>Refresh</Btn>
+        </Empty></Card>
+      )
       : !data.leads.length ? (
         <Card><Empty icon="funnel" title="Start tracking leads" sub="Add enquiries from IndiaMART, calls, WhatsApp or walk-ins, and never miss a follow-up.">
           <Btn kind="primary" icon="plus" onClick={() => open("lead")}>Add first lead</Btn>

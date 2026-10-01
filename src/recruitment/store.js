@@ -15,7 +15,7 @@ export const moveStage = (c, stage) => c.stage === stage ? c : {
 };
 
 export const useRecruitment = () => {
-  const { data, setData, mode, loading, load, save, remove } = useCollections("recruitment", COLS, "kre_recruitment_v1");
+  const { data, setData, mode, error, loading, load, save, remove } = useCollections("recruitment", COLS, "kre_recruitment_v1");
 
   // Demo data so HR can try the tools before real candidates arrive (local mode only).
   const seed = useCallback(() => {
@@ -43,5 +43,5 @@ export const useRecruitment = () => {
     });
   }, [setData]);
 
-  return { data, mode, loading, load, save, remove, seed };
+  return { data, mode, error, loading, load, save, remove, seed };
 };
