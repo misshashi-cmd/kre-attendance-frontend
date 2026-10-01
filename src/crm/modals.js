@@ -162,7 +162,7 @@ export const ActivityModal = ({ act, leads, me, save, notify, onClose }) => {
 };
 
 // ========== IMPORT FROM EXCEL / CSV ==========
-export const ImportModal = ({ leads, me, save, notify, onClose }) => {
+export const ImportModal = ({ leads, me, saveMany, notify, onClose }) => {
   const [text, setText] = useState("");
   const [busy, run] = useSubmit(notify, onClose);
   const rows = text.trim() ? parseCsv(text) : [];
@@ -180,7 +180,7 @@ export const ImportModal = ({ leads, me, save, notify, onClose }) => {
     r.readAsText(fl);
   };
   const submit = () => run(async () => {
-    for (const r of fresh) await save("leads", { stage: "new", priority: "warm", unit: "MT", owner: me, next_follow_up: today(), stage_on: today(), stage_history: [{ stage: "new", at: today() }], ...r, source: r.source || "Other", quantity: num(r.quantity), value: num(String(r.value || "").replace(/[₹,\s]/g, "")) });
+    await saveMany("leads", fresh.map(r => ({ stage: "new", priority: "warm", unit: "MT", owner: me, next_follow_up: today(), stage_on: today(), stage_history: [{ stage: "new", at: today() }], ...r, source: r.source || "Other", quantity: num(r.quantity), value: num(String(r.value || "").replace(/[₹,\s]/g, "")) })));
   }, `${fresh.length} lead${fresh.length === 1 ? "" : "s"} imported`);
 
   return (

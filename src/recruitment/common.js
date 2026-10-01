@@ -18,7 +18,7 @@ export const JOB_STATUS = { open: [C.ok, "Open"], "on-hold": [C.wn, "On hold"], 
 export const RESULTS = { pending: [C.tm, "Pending"], selected: [C.ok, "Selected"], rejected: [C.no, "Rejected"], "on-hold": [C.wn, "On hold"] };
 export const OFFER_STATUS = { draft: [C.tm, "Draft"], sent: [C.in, "Sent"], accepted: [C.ok, "Accepted"], declined: [C.no, "Declined"] };
 
-export const SOURCES = ["Naukri", "LinkedIn", "Indeed", "Referral", "Walk-in", "Company website", "Campus", "Consultant", "Other"];
+export const SOURCES = ["Naukri", "WorkIndia", "Apna", "Indeed", "LinkedIn", "Referral", "Walk-in", "Company website", "Campus", "Consultant", "Other"];
 export const ROUNDS = ["HR", "Technical", "Managerial", "Final"];
 export const MODES = ["In-person", "Video", "Phone"];
 export const EMP_TYPES = ["Full-time", "Part-time", "Contract", "Internship"];
@@ -52,3 +52,54 @@ export const gcalLink = ({ title, date, time, duration = 30, details = "", locat
   const q = new URLSearchParams({ action: "TEMPLATE", text: title, dates: `${f(start)}/${f(end)}`, details, location });
   return `https://calendar.google.com/calendar/render?${q}`;
 };
+
+// ---------- job details as each job site wants them ----------
+const n = v => v === "" || v === null || v === undefined || isNaN(v) ? null : Number(v);
+const lakhs = monthly => +((monthly * 12) / 1e5).toFixed(1);
+
+// "2–5 years", "2+ years", "Fresher" — falls back to the old free-text field.
+export const expText = j => {
+  const lo = n(j.exp_min), hi = n(j.exp_max);
+  if (lo === null && hi === null) return j.experience || "";
+  if (!lo && !hi) return "Fresher";
+  if (hi === null) return `${lo}+ years`;
+  return `${lo || 0}–${hi} years`;
+};
+// "₹15,000–25,000 / month" — falls back to the old free-text field.
+export const salText = j => {
+  const lo = n(j.sal_min), hi = n(j.sal_max);
+  if (lo === null && hi === null) return j.salary || "";
+  const f = x => x.toLocaleString("en-IN");
+  return `₹${lo !== null && hi !== null ? `${f(lo)}–${f(hi)}` : f(lo ?? hi)} / month`;
+};
+// "₹1.8–3 Lacs P.A." (Naukri style)
+export const salLakhs = j => {
+  const lo = n(j.sal_min), hi = n(j.sal_max);
+  if (lo === null && hi === null) return j.salary || "";
+  return `₹${lo !== null && hi !== null ? `${lakhs(lo)}–${lakhs(hi)}` : lakhs(lo ?? hi)} Lacs P.A.`;
+};
+
+const desc = j => [j.description, j.skills && `Key skills: ${j.skills}`, j.education && `Education: ${j.education}`, j.shift && `Shift / timing: ${j.shift}`].filter(Boolean).join("\n\n");
+const place = j => [j.area, j.location].filter(Boolean).join(", ");
+
+// Each site's "post a job" page and the fields its form asks for, in its own wording.
+export const PORTALS = [
+  { k: "naukri", l: "Naukri", url: "https://recruit.naukri.com/", fields: j => [
+    ["Job title", j.title], ["Employment type", j.employment_type], ["Work experience", expText(j)],
+    ["Annual salary (CTC)", salLakhs(j)], ["Location", j.location], ["Key skills", j.skills],
+    ["Education", j.education], ["Vacancies", j.openings], ["Job description", desc(j)],
+  ] },
+  { k: "workindia", l: "WorkIndia", url: "https://www.workindia.in/employers/", fields: j => [
+    ["Job title", j.title], ["Monthly salary", salText(j)], ["City", j.location], ["Area / locality", j.area],
+    ["Shift / timing", j.shift], ["Experience", expText(j)], ["Education", j.education], ["Openings", j.openings],
+    ["Job description", desc(j)],
+  ] },
+  { k: "indeed", l: "Indeed", url: "https://employers.indeed.com/", fields: j => [
+    ["Job title", j.title], ["Job location", place(j)], ["Job type", j.employment_type], ["Pay", salText(j)],
+    ["Number of people to hire", j.openings], ["Experience", expText(j)], ["Job description", desc(j)],
+  ] },
+  { k: "linkedin", l: "LinkedIn", url: "https://www.linkedin.com/talent/post-a-job", fields: j => [
+    ["Job title", j.title], ["Company", "KRE Group"], ["Job location", place(j)], ["Employment type", j.employment_type],
+    ["Description", [desc(j), expText(j) && `Experience: ${expText(j)}`, salText(j) && `Salary: ${salText(j)}`, j.apply_contact && `To apply: ${j.apply_contact}`].filter(Boolean).join("\n\n")],
+  ] },
+];

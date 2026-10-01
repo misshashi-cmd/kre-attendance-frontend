@@ -3,6 +3,7 @@ import { C, Ico, Btn, Card } from "../ui";
 import { useRecruitment, today } from "./store";
 import { stageOf, Empty, downloadCsv } from "./common";
 import { JobModal, CandidateModal, InterviewModal, OfferModal } from "./modals";
+import { PostModal, ImportApplicantsModal } from "./sources";
 import { Overview, Jobs, Pipeline, Interviews, Offers } from "./views";
 
 const TABS = [
@@ -14,7 +15,7 @@ const TABS = [
 ];
 
 export default function Recruitment({ notify }) {
-  const { data, mode, error, loading, load, save, remove, seed } = useRecruitment();
+  const { data, mode, error, loading, load, save, saveMany, remove, seed } = useRecruitment();
   const [tab, setTab] = useState("overview");
   const [modal, setModal] = useState(null); // { type: "job" | "cand" | "iv" | "offer", item }
   const [jobFilter, setJobFilter] = useState("");
@@ -46,6 +47,7 @@ export default function Recruitment({ notify }) {
         </div>
         <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
           <Btn icon="ref" onClick={load}>Refresh</Btn>
+          <Btn icon="upload" onClick={() => data.jobs.length ? open("import") : notify("Create a job opening first", "error")}>Import applicants</Btn>
           <Btn icon="dl" onClick={exportCsv}>Export CSV</Btn>
           <Btn icon="brief" onClick={() => open("job")}>New job</Btn>
           <Btn icon="cal" onClick={() => data.candidates.length ? open("iv") : notify("Add a candidate first", "error")}>Schedule interview</Btn>
@@ -85,6 +87,8 @@ export default function Recruitment({ notify }) {
         onSchedule={iv => open("iv", iv)} onOffer={c => open("offer", c)} />}
       {modal?.type === "iv" && <InterviewModal {...m} iv={modal.item} candidates={data.candidates} jobs={data.jobs} />}
       {modal?.type === "offer" && <OfferModal {...m} cand={modal.item} job={jobOf(modal.item.job_id)} />}
+      {modal?.type === "post" && <PostModal {...m} job={data.jobs.find(j => j.id === modal.item.id) || modal.item} />}
+      {modal?.type === "import" && <ImportApplicantsModal {...m} saveMany={saveMany} jobs={data.jobs} candidates={data.candidates} defaultJob={modal.item.job_id} />}
     </div>
   );
 }

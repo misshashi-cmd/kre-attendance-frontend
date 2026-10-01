@@ -1,17 +1,19 @@
 import React, { useRef } from "react";
 import { C, Ico, Btn, Modal, Field, Grid, inp, useForm, useSubmit, num, Opts } from "../ui";
 import { today, addDays, moveStage } from "./store";
-import { STAGES, JOB_STATUS, RESULTS, OFFER_STATUS, SOURCES, ROUNDS, MODES, EMP_TYPES, ONBOARDING, Pill, Stars, SectionTitle, inr, dfmt, gcalLink } from "./common";
+import { STAGES, JOB_STATUS, RESULTS, OFFER_STATUS, SOURCES, ROUNDS, MODES, EMP_TYPES, ONBOARDING, Pill, Stars, SectionTitle, inr, dfmt, gcalLink, expText, salText } from "./common";
 
 // ========== JOB ==========
 export const JobModal = ({ job, candidates, save, remove, notify, onClose }) => {
-  const [f, , on] = useForm({ title: "", department: "", location: "", employment_type: "Full-time", openings: 1, experience: "", salary: "", status: "open", hiring_manager: "", target_date: "", skills: "", description: "", apply_contact: "", ...job });
+  const [f, , on] = useForm({ title: "", department: "", location: "", employment_type: "Full-time", openings: 1, experience: "", salary: "", exp_min: "", exp_max: "", sal_min: "", sal_max: "", education: "", shift: "", area: "", status: "open", hiring_manager: "", target_date: "", skills: "", description: "", apply_contact: "", ...job });
   const [busy, run] = useSubmit(notify, onClose);
   const inUse = job?.id && candidates.some(c => c.job_id === job.id);
 
   const submit = () => {
     if (!f.title.trim()) return notify("Job title is required", "error");
-    run(() => save("jobs", { ...f, title: f.title.trim(), openings: num(f.openings) || 1 }), job?.id ? "Job updated" : "Job opening created");
+    if (f.exp_min !== "" && f.exp_max !== "" && +f.exp_max < +f.exp_min) return notify("Maximum experience can't be less than minimum", "error");
+    if (f.sal_min !== "" && f.sal_max !== "" && +f.sal_max < +f.sal_min) return notify("Maximum salary can't be less than minimum", "error");
+    run(() => save("jobs", { ...f, title: f.title.trim(), openings: num(f.openings) || 1, exp_min: num(f.exp_min), exp_max: num(f.exp_max), sal_min: num(f.sal_min), sal_max: num(f.sal_max) }), job?.id ? "Job updated" : "Job opening created");
   };
   const del = () => {
     if (inUse) return notify("This job has candidates — set its status to Closed instead", "error");
@@ -30,8 +32,23 @@ export const JobModal = ({ job, candidates, save, remove, notify, onClose }) => 
         <Field label="Location"><input style={inp} value={f.location} onChange={on("location")} placeholder="e.g. Jamshedpur" /></Field>
         <Field label="Employment type"><select style={inp} value={f.employment_type} onChange={on("employment_type")}><Opts list={EMP_TYPES} /></select></Field>
         <Field label="No. of openings"><input style={inp} type="number" min="1" value={f.openings} onChange={on("openings")} /></Field>
-        <Field label="Experience"><input style={inp} value={f.experience} onChange={on("experience")} placeholder="e.g. 2-5 years" /></Field>
-        <Field label="Salary range"><input style={inp} value={f.salary} onChange={on("salary")} placeholder="e.g. ₹4–6 LPA" /></Field>
+        <Field label="Area / locality"><input style={inp} value={f.area} onChange={on("area")} placeholder="e.g. Bistupur" /></Field>
+        <Field label={`Experience (years)${f.experience && f.exp_min === "" && f.exp_max === "" ? ` — was "${f.experience}"` : ""}`}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <input style={inp} type="number" min="0" value={f.exp_min} onChange={on("exp_min")} placeholder="Min" />
+            <span style={{ color: C.td }}>–</span>
+            <input style={inp} type="number" min="0" value={f.exp_max} onChange={on("exp_max")} placeholder="Max" />
+          </div>
+        </Field>
+        <Field label={`Salary per month (₹)${f.salary && f.sal_min === "" && f.sal_max === "" ? ` — was "${f.salary}"` : ""}`}>
+          <div style={{ display: "flex", gap: 6, alignItems: "center" }}>
+            <input style={inp} type="number" min="0" step="500" value={f.sal_min} onChange={on("sal_min")} placeholder="Min" />
+            <span style={{ color: C.td }}>–</span>
+            <input style={inp} type="number" min="0" step="500" value={f.sal_max} onChange={on("sal_max")} placeholder="Max" />
+          </div>
+        </Field>
+        <Field label="Education"><input style={inp} value={f.education} onChange={on("education")} placeholder="e.g. B.Com / Graduate" /></Field>
+        <Field label="Shift / timing"><input style={inp} value={f.shift} onChange={on("shift")} placeholder="e.g. 9:30 AM – 6:30 PM, Mon–Sat" /></Field>
         <Field label="Hiring manager"><input style={inp} value={f.hiring_manager} onChange={on("hiring_manager")} /></Field>
         <Field label="Target closing date"><input style={inp} type="date" value={f.target_date} onChange={on("target_date")} /></Field>
         <Field label="Status"><select style={inp} value={f.status} onChange={on("status")}><Opts list={Object.entries(JOB_STATUS).map(([k, [, l]]) => [k, l])} /></select></Field>
@@ -46,8 +63,9 @@ export const JobModal = ({ job, candidates, save, remove, notify, onClose }) => 
 // Plain-text job post for WhatsApp / LinkedIn / job boards.
 export const jobPostText = j => [
   `We're hiring: ${j.title} — KRE Group\n`,
-  [j.location && `Location: ${j.location}`, j.employment_type && `Type: ${j.employment_type}`, j.experience && `Experience: ${j.experience}`].filter(Boolean).join(" | "),
-  j.salary && `Salary: ${j.salary}`,
+  [(j.area || j.location) && `Location: ${[j.area, j.location].filter(Boolean).join(", ")}`, j.employment_type && `Type: ${j.employment_type}`, expText(j) && `Experience: ${expText(j)}`].filter(Boolean).join(" | "),
+  salText(j) && `Salary: ${salText(j)}`,
+  j.shift && `Timing: ${j.shift}`,
   j.openings > 1 && `Openings: ${j.openings}`,
   j.description && `\n${j.description}`,
   j.skills && `\nKey skills: ${j.skills}`,
