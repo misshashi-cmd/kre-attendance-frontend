@@ -6,7 +6,7 @@ import { LeadModal, ActivityModal, ImportModal } from "./modals";
 import { Overview, Pipeline, Leads, FollowUps } from "./views";
 
 export default function Crm({ notify, user }) {
-  const { data, mode, error, loading, load, save, remove, seed } = useCrm();
+  const { data, mode, error, loading, load, save, saveMany, remove, seed } = useCrm();
   const [tab, setTab] = useState("overview");
   const [modal, setModal] = useState(null); // { type: "lead" | "act" | "import", item }
 
@@ -15,7 +15,7 @@ export default function Crm({ notify, user }) {
   const me = user?.name || "";
   const owners = [...new Set(data.leads.map(l => l.owner).filter(Boolean))].sort();
   const due = data.leads.filter(l => isOpen(l) && l.next_follow_up && l.next_follow_up <= today()).length;
-  const m = { save, remove, notify, onClose: close, me };
+  const m = { save, saveMany, remove, notify, onClose: close, me };
   const v = { data, open, save, notify, setTab, owners, me };
 
   const tabs = [

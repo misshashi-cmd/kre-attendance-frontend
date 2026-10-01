@@ -1,7 +1,8 @@
 import React, { useState } from "react";
 import { C, Ico, Av, Stat, Btn, Card, Bar, Row, inp, fmt } from "../ui";
 import { today, addDays, daysBetween, moveStage } from "./store";
-import { STAGES, ACTIVE, stageOf, JOB_STATUS, RESULTS, OFFER_STATUS, Pill, Stars, Empty, SectionTitle, inr, dfmt, copyText } from "./common";
+import { STAGES, ACTIVE, stageOf, JOB_STATUS, RESULTS, OFFER_STATUS, Pill, Stars, Empty, SectionTitle, inr, dfmt, copyText, expText, salText } from "./common";
+import { PostedChips } from "./sources";
 import { jobPostText } from "./modals";
 
 const DateChip = ({ iso }) => {
@@ -106,8 +107,8 @@ export const Jobs = ({ data, open, notify, setTab, setJobFilter }) => {
             <Pill c={sc}>{sl}</Pill>
           </div>
           <div style={{ display: "flex", gap: 14, fontSize: 12, color: C.tm, flexWrap: "wrap" }}>
-            {j.experience && <span>{j.experience}</span>}
-            {j.salary && <span>{j.salary}</span>}
+            {expText(j) && <span>{expText(j)}</span>}
+            {salText(j) && <span>{salText(j)}</span>}
             {j.target_date && <span style={{ color: overdue ? C.no : C.tm }}>Target {dfmt(j.target_date)}</span>}
           </div>
           <div style={{ display: "flex", gap: 4 }}>
@@ -118,7 +119,10 @@ export const Jobs = ({ data, open, notify, setTab, setJobFilter }) => {
               </div>); })}
           </div>
           <div style={{ fontSize: 12, color: hired >= (+j.openings || 1) ? C.ok : C.tm }}>Filled {hired} of {j.openings || 1} position{(+j.openings || 1) === 1 ? "" : "s"}</div>
+          <PostedChips job={j} />
           <div style={{ display: "flex", gap: 6, flexWrap: "wrap", marginTop: "auto" }}>
+            <Btn kind="primary" icon="upload" onClick={() => open("post", j)}>Post on job sites</Btn>
+            <Btn icon="dl" onClick={() => open("import", { job_id: j.id })}>Import applicants</Btn>
             <Btn icon="users" onClick={() => { setJobFilter(j.id); setTab("pipeline"); }}>Pipeline</Btn>
             <Btn icon="copy" onClick={() => copy(j)}>Copy job post</Btn>
             <Btn icon="edit" onClick={() => open("job", j)}>Edit</Btn>

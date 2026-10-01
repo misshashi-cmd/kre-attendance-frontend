@@ -66,11 +66,27 @@ export const useCollections = (base, cols, storageKey) => {
     return rec;
   }, [base, mode]);
 
+  // Many new records in one request (spreadsheet imports). Returns { items, skipped }.
+  const saveMany = useCallback(async (col, items) => {
+    if (mode !== "api" && mode !== "local") throw new Error("Not connected to the server. Press Refresh and try again.");
+    let recs = items.map(it => ({ ...it, id: it.id || uid(), created_on: it.created_on || today() }));
+    let skipped = 0;
+    if (mode === "api") {
+      for (let i = 0; i < recs.length; i += 500) {
+        const r = await call(`/${base}/${col}/bulk`, { method: "POST", body: JSON.stringify({ items: recs.slice(i, i + 500) }) });
+        const added = r.items || [];
+        skipped += r.skipped || 0;
+        setData(d => ({ ...d, [col]: [...d[col], ...added] }));
+      }
+    } else setData(d => ({ ...d, [col]: [...d[col], ...recs] }));
+    return { items: recs, skipped };
+  }, [base, mode]);
+
   const remove = useCallback(async (col, id) => {
     if (mode !== "api" && mode !== "local") throw new Error("Not connected to the server. Press Refresh and try again.");
     if (mode === "api") await call(`/${base}/${col}/${id}`, { method: "DELETE" });
     setData(d => ({ ...d, [col]: d[col].filter(x => x.id !== id) }));
   }, [base, mode]);
 
-  return { data, setData, mode, error, loading, load, save, remove };
+  return { data, setData, mode, error, loading, load, save, saveMany, remove };
 };

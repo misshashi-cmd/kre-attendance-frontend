@@ -205,3 +205,27 @@ export const Bar = ({ label, value, max, c }) => (
 export const Row = ({ children, onClick, style }) => (
   <div onClick={onClick} style={{ display: "flex", alignItems: "center", gap: 12, padding: "10px 12px", background: C.sf, borderRadius: 12, border: `1px solid ${C.bdr}`, marginBottom: 8, cursor: onClick ? "pointer" : "default", ...style }}>{children}</div>
 );
+
+// Minimal CSV parser (handles quoted fields, commas and newlines inside quotes).
+export const parseCsv = text => {
+  const rows = []; let row = [], f = "", q = false;
+  text = text.replace(/^﻿/, "");
+  for (let i = 0; i < text.length; i++) {
+    const ch = text[i];
+    if (q) {
+      if (ch === '"' && text[i + 1] === '"') { f += '"'; i++; }
+      else if (ch === '"') q = false;
+      else f += ch;
+    } else if (ch === '"') q = true;
+    else if (ch === ",") { row.push(f); f = ""; }
+    else if (ch === "\n" || ch === "\r") {
+      if (ch === "\r" && text[i + 1] === "\n") i++;
+      row.push(f); f = "";
+      if (row.some(x => x.trim())) rows.push(row);
+      row = [];
+    } else f += ch;
+  }
+  row.push(f);
+  if (row.some(x => x.trim())) rows.push(row);
+  return rows;
+};

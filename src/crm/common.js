@@ -1,5 +1,7 @@
 import { C } from "../ui";
 
+export { parseCsv } from "../ui";
+
 export const STAGES = [
   { k: "new", l: "New", c: C.tm },
   { k: "contacted", l: "Contacted", c: C.in },
@@ -50,30 +52,6 @@ export const TEMPLATES = [
   { k: "quotation", l: "Quotation follow-up", t: (l, me) => `Hello ${l.contact_name || ""}, hope you received our quotation${l.product ? ` for ${l.product}` : ""}${l.quantity ? ` (${l.quantity} ${l.unit || ""})` : ""}. Happy to clarify anything or discuss the terms. — ${me}, KRE Group` },
   { k: "thanks", l: "Thank you for the order", t: (l, me) => `Hello ${l.contact_name || ""}, thank you for your order with KRE Group! We will share dispatch details shortly. — ${me}` },
 ];
-
-// Minimal CSV parser (handles quoted fields, commas and newlines inside quotes).
-export const parseCsv = text => {
-  const rows = []; let row = [], f = "", q = false;
-  text = text.replace(/^﻿/, "");
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i];
-    if (q) {
-      if (ch === '"' && text[i + 1] === '"') { f += '"'; i++; }
-      else if (ch === '"') q = false;
-      else f += ch;
-    } else if (ch === '"') q = true;
-    else if (ch === ",") { row.push(f); f = ""; }
-    else if (ch === "\n" || ch === "\r") {
-      if (ch === "\r" && text[i + 1] === "\n") i++;
-      row.push(f); f = "";
-      if (row.some(x => x.trim())) rows.push(row);
-      row = [];
-    } else f += ch;
-  }
-  row.push(f);
-  if (row.some(x => x.trim())) rows.push(row);
-  return rows;
-};
 
 // Spreadsheet column names we recognise for each lead field.
 export const IMPORT_FIELDS = {
