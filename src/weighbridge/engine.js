@@ -13,6 +13,9 @@
  *     challan_no, challan_weight,
  *     slip_gross, slip_tare, slip_net,          // printed on the software slip
  *     ind_gross, ind_tare,                      // read off the weighbridge indicator display
+ *     slip_photo_id, gross_photo_id, tare_photo_id,
+ *     source: { slip_gross: "photo" | "typed", ind_gross: "photo" | "admin", ... },
+ *     photo_meta: { slip: {...}, gross: {...}, tare: {...} },   // what the photo reader saw
  *     gross_time, tare_time, ... }
  */
 
@@ -91,7 +94,7 @@ function verifyWeighment(w, ctx = {}) {
   // ---------- 2. Slip vs weighbridge indicator ----------
   const cmp = (k, label, slip, ind) => {
     if (slip === null || ind === null) {
-      add("indicator", k, label, "skip", ind === null ? "Indicator reading not entered" : "Slip value not entered");
+      add("indicator", k, label, "skip", ind === null ? "No indicator reading — take the indicator photo" : "Slip value missing");
       return null;
     }
     const d = slip - ind;
@@ -158,6 +161,32 @@ function verifyWeighment(w, ctx = {}) {
     const st = Math.abs(pct) <= s.shortage_pct ? "pass" : "warn";
     add("party", "challan", "Net weight vs party challan", st,
       `Net ${kg(net)} vs challan ${kg(cw)} — ${diff < 0 ? "shortage" : diff > 0 ? "excess" : "no difference"} ${diff ? `${kg(Math.abs(diff))} (${Math.abs(pct).toFixed(2)}%, limit ${s.shortage_pct}%)` : ""}`.trim());
+  }
+
+  // ---------- 6. Photos (weights read from photos, not typed) ----------
+  const src = w.source || {}, meta = w.photo_meta || {};
+  if (!w.slip_photo_id) {
+    add("photo", "slip_photo", "Slip photo", "warn", "No slip photo — slip weights were typed by hand");
+  } else {
+    const m = meta.slip || {};
+    const typed = ["slip_gross", "slip_tare", "slip_net"].filter(k => src[k] === "typed");
+    add("photo", "slip_photo", "Slip photo", m.is_slip === false ? "fail" : !m.readable || typed.length || m.notes ? "warn" : "pass",
+      m.is_slip === false ? "The photo is not a weighbridge slip"
+      : !m.readable || typed.length ? `Photo not clear — ${typed.length ? typed.map(k => k.replace("slip_", "")).join(", ") + " typed by hand" : "check the values"}`
+      : m.notes ? `Read from photo. Note: ${m.notes}` : "Slip no., vehicle and weights read from the photo");
+  }
+  for (const [k, label, field] of [["gross", "Indicator photo — gross", "gross_photo_id"], ["tare", "Indicator photo — tare", "tare_photo_id"]]) {
+    const m = meta[k], s2 = src[`ind_${k}`];
+    if (!w[field]) {
+      add("photo", `${k}_photo`, label, s2 === "admin" ? "warn" : "skip", s2 === "admin" ? "No photo — reading typed by admin" : "No indicator photo");
+    } else if (m && m.is_indicator === false) {
+      add("photo", `${k}_photo`, label, "fail", "The photo does not show the weighbridge indicator display");
+    } else if (!m || !m.readable || s2 !== "photo") {
+      add("photo", `${k}_photo`, label, "warn", s2 === "admin" ? "Display not readable — reading typed by admin" : "Display not readable — take the photo again");
+    } else {
+      add("photo", `${k}_photo`, label, m.stable === false ? "warn" : "pass",
+        `Display showed "${m.display_text}" = ${kg(w[`ind_${k}`])}${m.stable === false ? " while in MOTION (not stable)" : m.stable ? ", stable" : ""}${m.notes ? `. Note: ${m.notes}` : ""}`);
+    }
   }
 
   const counts = { pass: 0, warn: 0, fail: 0, skip: 0 };

@@ -1,8 +1,9 @@
-import React, { useMemo } from "react";
+import React, { useMemo, useState } from "react";
 import { C, Ico, Btn, Modal, Field, Grid, inp, useForm, useSubmit, num, Opts, SectionTitle } from "../ui";
 import { today, nowLocal } from "./store";
 import { verifyWeighment, normVehicle, isValidVehicle, DEFAULT_SETTINGS, STATUS, CHECK, GROUPS, DIRECTIONS, MATERIALS, VEHICLE_TYPES, kg, mt, signedKg, dtfmt } from "./common";
 import { printReports } from "./print";
+import { PhotoTile } from "./photos";
 
 // ========== VERIFICATION RESULT ==========
 export const Banner = ({ st, v }) => {
@@ -46,10 +47,15 @@ const Diff = ({ d, tol }) => {
 };
 
 // ========== WEIGHMENT (slip entry + verification) ==========
+// Slip field <- slip photo reading field (same map as the API)
+const SLIP_FROM_PHOTO = { slip_no: "slip_no", vehicle_no: "vehicle_no", date: "date", slip_gross: "gross_kg", slip_tare: "tare_kg", slip_net: "net_kg", gross_time: "gross_time", tare_time: "tare_time" };
+
 export const WeighmentModal = ({ item, data, ctx, isAdmin, me, save, remove, notify, onClose }) => {
   const isNew = !item?.id;
   const [f, setF, on] = useForm({ slip_no: "", date: today(), direction: "inward", vehicle_no: "", driver_name: "", party: "", material: "", challan_no: "", challan_weight: "",
-    slip_gross: "", slip_tare: "", slip_net: "", ind_gross: "", ind_tare: "", gross_time: "", tare_time: "", operator: me, remarks: "", decision: "", decision_note: "", ...item });
+    slip_gross: "", slip_tare: "", slip_net: "", ind_gross: "", ind_tare: "", gross_time: "", tare_time: "", operator: me, remarks: "", decision: "", decision_note: "",
+    slip_photo_id: "", gross_photo_id: "", tare_photo_id: "", source: {}, photo_meta: {}, ...item });
+  const [previews, setPreviews] = useState({});
   const [busy, run] = useSubmit(notify, onClose);
   const locked = !isAdmin && !!item?.decision;
   const tol = Number(ctx.settings.tolerance_kg ?? DEFAULT_SETTINGS.tolerance_kg);
@@ -68,20 +74,73 @@ export const WeighmentModal = ({ item, data, ctx, isAdmin, me, save, remove, not
   };
   const stamp = k => () => setF(p => ({ ...p, [k]: nowLocal() }));
 
+  // Photo readings fill the form the same way the server does when it saves (weighbridgeHooks.js).
+  const onSlipPhoto = ph => {
+    const r = ph.reading;
+    setPreviews(p => ({ ...p, slip: ph.preview }));
+    setF(p => {
+      const n = { ...p, slip_photo_id: ph.id, source: { ...p.source }, photo_meta: { ...p.photo_meta, slip: { is_slip: r.is_slip, readable: r.readable, notes: r.notes || "" } } };
+      for (const [k, rk] of Object.entries(SLIP_FROM_PHOTO)) {
+        if (r.is_slip && r[rk] !== null && r[rk] !== undefined && r[rk] !== "") { n[k] = k === "vehicle_no" ? normVehicle(r[rk]) : r[rk]; n.source[k] = "photo"; }
+        else if (n.source[k] === "photo") delete n.source[k];
+      }
+      for (const k of ["party", "material"]) if (!n[k] && r.is_slip && r[k]) n[k] = r[k];
+      return n;
+    });
+    if (!r.is_slip) notify("That photo is not a weighbridge slip — take it again", "error");
+    else if (!r.readable) notify("Slip photo is not clear — take it again", "error");
+  };
+  const onIndicatorPhoto = which => ph => {
+    const r = ph.reading, ok = r.is_indicator && r.readable && r.weight_kg !== null;
+    setPreviews(p => ({ ...p, [which]: ph.preview }));
+    setF(p => {
+      const source = { ...p.source };
+      if (ok) source[`ind_${which}`] = "photo"; else delete source[`ind_${which}`];
+      return { ...p, [`${which}_photo_id`]: ph.id, [`ind_${which}`]: ok ? r.weight_kg : "", source,
+        photo_meta: { ...p.photo_meta, [which]: { is_indicator: r.is_indicator, readable: r.readable, display_text: r.display_text, stable: r.stable, notes: r.notes || "" } } };
+    });
+    if (!r.is_indicator) notify("That photo doesn't show the weighbridge indicator — take it again", "error");
+    else if (!ok) notify("Indicator display is not readable — take the photo again", "error");
+    else if (r.stable === false) notify("Indicator was not stable (MOTION) — wait for STABLE and retake", "error");
+  };
+  const fromPhoto = k => f.source?.[k] === "photo";
+  const slipSummary = () => {
+    const m = f.photo_meta?.slip;
+    if (!f.slip_photo_id || !m) return null;
+    if (m.is_slip === false) return ["Not a weighbridge slip — retake", true];
+    if (!m.readable) return ["Not clear — retake the photo", true];
+    return [`Slip ${f.slip_no || "?"} · ${f.vehicle_no || "?"} · G ${kg(f.slip_gross)} · T ${kg(f.slip_tare)} · N ${kg(f.slip_net)}${m.notes ? ` · ⚠ ${m.notes}` : ""}`, !!m.notes];
+  };
+  const indSummary = which => {
+    const m = f.photo_meta?.[which];
+    if (!f[`${which}_photo_id`] || !m) return null;
+    if (m.is_indicator === false) return ["Not the indicator display — retake", true];
+    if (!m.readable || !fromPhoto(`ind_${which}`)) return ["Display not readable — retake", true];
+    return [`Display "${m.display_text}" = ${kg(f[`ind_${which}`])}${m.stable === false ? " · MOTION — retake when STABLE" : m.stable ? " · stable" : ""}${m.notes ? ` · ${m.notes}` : ""}`, m.stable === false];
+  };
+
   const submit = () => {
     if (!String(f.slip_no).trim()) return notify("Enter the slip number", "error");
     if (!rec.vehicle_no) return notify("Enter the vehicle number", "error");
-    if (rec.slip_gross === "" || rec.slip_tare === "") return notify("Enter gross and tare weight from the slip", "error");
     if (f.decision === "rejected" && !String(f.decision_note).trim()) return notify("Write why the slip is rejected", "error");
     const out = { ...rec, slip_no: String(f.slip_no).trim() };
-    if (out.slip_net === "") out.slip_net = calcNet;
+    if (out.slip_net === "" && calcNet !== "" && !f.slip_photo_id) out.slip_net = calcNet;
     if (!isAdmin) { delete out.decision; delete out.decision_note; }
     run(() => save("weighments", out), isNew ? `Slip ${out.slip_no} saved — ${STATUS[out.decision || verifyWeighment(out, ctx).status].l}` : "Weighment updated");
   };
   const del = () => window.confirm(`Delete slip ${item.slip_no}? This cannot be undone.`) && run(() => remove("weighments", item.id), "Weighment deleted");
 
   // A plain function (not a component) so the inputs keep focus while typing.
-  const wIn = (k, label) => <input style={{ ...inp, textAlign: "right", fontVariantNumeric: "tabular-nums", fontSize: 15, fontWeight: 600 }} type="number" min="0" step="1" inputMode="numeric" value={f[k]} onChange={on(k)} disabled={locked} aria-label={label} />;
+  // Indicator readings only come from photos (admins may type one when a photo can't be read);
+  // slip values read from the photo can't be changed by operators.
+  const wIn = (k, label) => {
+    const ro = locked || (!isAdmin && (k.startsWith("ind_") || fromPhoto(k)));
+    return <input style={{ ...inp, textAlign: "right", fontVariantNumeric: "tabular-nums", fontSize: 15, fontWeight: 600, ...(fromPhoto(k) ? { borderColor: `${C.ok}66`, background: C.okD } : {}) }}
+      type="number" min="0" step="1" inputMode="numeric" value={f[k] ?? ""} onChange={on(k)} disabled={ro} aria-label={label}
+      placeholder={k.startsWith("ind_") && !isAdmin ? "photo" : ""} title={fromPhoto(k) ? "Read from photo" : undefined} />;
+  };
+  const ro = k => !isAdmin && fromPhoto(k);
+  const [ss, gs, ts] = [slipSummary(), indSummary("gross"), indSummary("tare")];
   const cell = { padding: "6px 8px", fontSize: 12 };
 
   return (
@@ -94,14 +153,21 @@ export const WeighmentModal = ({ item, data, ctx, isAdmin, me, save, remove, not
       {locked && <div style={{ fontSize: 12, color: C.wn, background: C.wnD, padding: "8px 12px", borderRadius: 10, marginBottom: 14 }}>This slip was {item.decision} by {item.decision_by}. Only an admin can change it now.</div>}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(340px, 100%), 1fr))", gap: 20, alignItems: "start" }}>
         <div>
+          <SectionTitle>Photos — weights are read from these, not typed</SectionTitle>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10, marginBottom: 20 }}>
+            <PhotoTile kind="slip" title="1 · Software slip" hint="Whole printed slip, flat, no glare" photoId={f.slip_photo_id} preview={previews.slip} summary={ss?.[0]} error={ss?.[1]} disabled={locked} onPhoto={onSlipPhoto} notify={notify} />
+            <PhotoTile kind="indicator" title="2 · Indicator — gross" hint="Display while the loaded truck is on the bridge" photoId={f.gross_photo_id} preview={previews.gross} summary={gs?.[0]} error={gs?.[1]} disabled={locked} onPhoto={onIndicatorPhoto("gross")} notify={notify} />
+            <PhotoTile kind="indicator" title="3 · Indicator — tare" hint="Display while the empty truck is on the bridge" photoId={f.tare_photo_id} preview={previews.tare} summary={ts?.[0]} error={ts?.[1]} disabled={locked} onPhoto={onIndicatorPhoto("tare")} notify={notify} />
+          </div>
+
           <SectionTitle>Trip details</SectionTitle>
           <fieldset disabled={locked} style={{ border: "none", padding: 0, margin: 0 }}>
             <Grid min={140}>
-              <Field label="Slip no. *"><input style={inp} value={f.slip_no} onChange={on("slip_no")} autoFocus={isNew} /></Field>
-              <Field label="Date"><input style={inp} type="date" value={f.date} onChange={on("date")} /></Field>
+              <Field label="Slip no. *"><input style={inp} value={f.slip_no} onChange={on("slip_no")} disabled={ro("slip_no")} /></Field>
+              <Field label="Date"><input style={inp} type="date" value={f.date} onChange={on("date")} disabled={ro("date")} /></Field>
               <Field label="Direction"><select style={inp} value={f.direction} onChange={on("direction")}><Opts list={DIRECTIONS} /></select></Field>
               <Field label="Vehicle no. *">
-                <input style={{ ...inp, textTransform: "uppercase", borderColor: rec.vehicle_no && !isValidVehicle(rec.vehicle_no) ? C.wn : C.bdr }} list="wb-vehicles" value={f.vehicle_no} onChange={onVehicle} placeholder="JH05AB1234" />
+                <input style={{ ...inp, textTransform: "uppercase", borderColor: rec.vehicle_no && !isValidVehicle(rec.vehicle_no) ? C.wn : C.bdr }} list="wb-vehicles" value={f.vehicle_no} onChange={onVehicle} placeholder="JH05AB1234" disabled={ro("vehicle_no")} />
                 <datalist id="wb-vehicles">{data.vehicles.map(x => <option key={x.id} value={x.vehicle_no}>{x.owner_name || ""}</option>)}</datalist>
               </Field>
               <Field label="Driver"><input style={inp} value={f.driver_name} onChange={on("driver_name")} /></Field>
@@ -138,7 +204,7 @@ export const WeighmentModal = ({ item, data, ctx, isAdmin, me, save, remove, not
                 </tbody>
               </table>
             </div>
-            <div style={{ fontSize: 11, color: C.td, marginTop: 6 }}>Type the indicator readings yourself from the weighbridge display (or its photo) — never copy them from the slip. Tolerance: {tol} kg. {rec.slip_net !== "" && `Net = ${mt(rec.slip_net)}.`}</div>
+            <div style={{ fontSize: 11, color: C.td, marginTop: 6 }}>Green values were read from the photos. Indicator readings come only from the indicator photos{isAdmin ? " (admins can type one when the photo can't be read)" : ""}. Tolerance: {tol} kg. {rec.slip_net !== "" && `Net = ${mt(rec.slip_net)}.`}</div>
 
             <div style={{ marginTop: 16 }}><Grid min={200}>
               <Field label={f.direction === "outward" ? "Tare time (1st weighment)" : "Gross time (1st weighment)"}>

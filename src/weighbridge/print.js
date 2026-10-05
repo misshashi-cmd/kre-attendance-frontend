@@ -1,4 +1,5 @@
 import { dfmt } from "../ui";
+import { imageUrl } from "../api";
 import { STATUS, CHECK, GROUPS, DIRECTIONS, statusOf, kg, mt, signedKg, dtfmt } from "./common";
 
 const esc = v => String(v ?? "").replace(/[&<>"']/g, c => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" }[c]));
@@ -16,11 +17,15 @@ const CSS = `
   .meta td { border: none; padding: 3px 8px 3px 0; } .meta td:nth-child(odd) { color: #64748b; width: 16%; }
   .sig { display: flex; gap: 24px; margin-top: 48px; } .sig div { flex: 1; border-top: 1px solid #0f172a; padding-top: 4px; text-align: center; color: #475569; }
   .foot { margin-top: 18px; color: #64748b; font-size: 10px; }
+  .photos { display: flex; gap: 10px; } .photos figure { margin: 0; flex: 1; } .photos img { width: 100%; height: 170px; object-fit: contain; border: 1px solid #cbd5e1; background: #f8fafc; }
+  .photos figcaption { font-size: 10px; color: #64748b; text-align: center; margin-top: 2px; }
   .page { page-break-after: always; } .page:last-child { page-break-after: auto; }
   @media print { body { margin: 10mm; } }
 `;
 
-const one = w => {
+const PHOTOS = [["slip_photo_id", "Software slip"], ["gross_photo_id", "Indicator — gross"], ["tare_photo_id", "Indicator — tare"]];
+
+const one = (w, imgs = {}) => {
   const v = w.verification || { checks: [] }, st = statusOf(w), S = STATUS[st];
   const ig = w.ind_gross, it = w.ind_tare, inet = v.indicator_net;
   const row = (l, slip, ind, d) => `<tr><td>${l}</td><td class="num">${kg(slip)}</td><td class="num">${kg(ind)}</td><td class="num" style="color:${d ? "#b91c1c" : "#15803d"};font-weight:600">${d === null || d === undefined ? "—" : d === 0 ? "0 kg ✓" : signedKg(d)}</td></tr>`;
@@ -47,6 +52,7 @@ const one = w => {
     <div style="margin-top:6px">Net weight: <b>${kg(w.slip_net)}</b> (${mt(w.slip_net)})</div>
     <h2>Verification checks (${v.counts?.pass || 0} pass · ${v.counts?.warn || 0} to check · ${v.counts?.fail || 0} fail)</h2>
     <table>${groups}</table>
+    ${PHOTOS.some(([k]) => imgs[w[k]]) ? `<h2>Photos</h2><div class="photos">${PHOTOS.filter(([k]) => imgs[w[k]]).map(([k, l]) => `<figure><img src="${imgs[w[k]]}"><figcaption>${l}</figcaption></figure>`).join("")}</div>` : ""}
     ${w.decision ? `<h2>Decision</h2><div><b style="color:${PRINT_COLORS[w.decision]}">${STATUS[w.decision].l}</b> by ${esc(w.decision_by)} on ${dtfmt(w.decision_at)}${w.decision_note ? ` — ${esc(w.decision_note)}` : ""}</div>` : ""}
     ${w.remarks ? `<h2>Remarks</h2><div>${esc(w.remarks)}</div>` : ""}
     <div class="sig"><div>Weighbridge operator</div><div>Verified by</div><div>Authorised signatory</div></div>
@@ -54,11 +60,19 @@ const one = w => {
   </div>`;
 };
 
-// Opens a print-ready verification report for one or more weighments.
+// Opens a print-ready verification report (with photos) for one or more weighments.
+// The window opens straight away so pop-up blockers allow it; photos load, then it prints.
 export const printReports = list => {
   const win = window.open("", "_blank");
   if (!win) return false;
-  win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Weighbridge verification ${esc(list.length === 1 ? list[0].slip_no : `(${list.length} slips)`)}</title><style>${CSS}</style></head><body>${list.map(one).join("")}<script>window.onload=()=>window.print()<\/script></body></html>`);
-  win.document.close();
+  win.document.write("<p style='font-family:Arial;padding:24px'>Preparing report…</p>");
+  (async () => {
+    const ids = [...new Set(list.flatMap(w => PHOTOS.map(([k]) => w[k])).filter(Boolean))];
+    const imgs = {};
+    if (ids.length <= 60) await Promise.all(ids.map(id => imageUrl(`/weighbridge/photos/${id}`).then(u => { imgs[id] = u; }).catch(() => {})));
+    win.document.open();
+    win.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Weighbridge verification ${esc(list.length === 1 ? list[0].slip_no : `(${list.length} slips)`)}</title><style>${CSS}</style></head><body>${list.map(w => one(w, imgs)).join("")}<script>window.onload=()=>setTimeout(()=>window.print(),300)<\/script></body></html>`);
+    win.document.close();
+  })();
   return true;
 };

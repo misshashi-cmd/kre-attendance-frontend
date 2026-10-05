@@ -20,6 +20,7 @@ export const CHECK = {
   skip: { c: C.td, i: "clock", l: "N/A" },
 };
 export const GROUPS = [
+  ["photo", "Photos"],
   ["slip", "Slip data"],
   ["indicator", "Slip vs weighbridge indicator"],
   ["vehicle", "Vehicle"],
