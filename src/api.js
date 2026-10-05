@@ -14,3 +14,10 @@ export const call = async (path, opts = {}) => {
   if (!r.ok) throw new Error(d.error || d.errors?.[0]?.msg || "Error");
   return d;
 };
+
+// Fetches an authenticated image (e.g. a weighbridge photo) and returns an object URL for <img src>.
+export const imageUrl = async path => {
+  const r = await fetch(`${API}${path}`, { headers: token ? { Authorization: `Bearer ${token}` } : {} });
+  if (!r.ok) throw new Error("Photo not available");
+  return URL.createObjectURL(await r.blob());
+};
