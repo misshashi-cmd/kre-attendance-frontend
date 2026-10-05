@@ -4,6 +4,7 @@ import { today, nowLocal } from "./store";
 import { verifyWeighment, normVehicle, isValidVehicle, DEFAULT_SETTINGS, STATUS, CHECK, GROUPS, DIRECTIONS, MATERIALS, VEHICLE_TYPES, kg, mt, signedKg, dtfmt } from "./common";
 import { printReports } from "./print";
 import { PhotoTile } from "./photos";
+import { call } from "../api";
 
 // ========== VERIFICATION RESULT ==========
 export const Banner = ({ st, v }) => {
@@ -236,6 +237,11 @@ export const WeighmentModal = ({ item, data, ctx, isAdmin, me, save, remove, not
             {item?.decision_by && <div style={{ fontSize: 11, color: C.td, marginTop: 6 }}>Last decision by {item.decision_by} · {dtfmt(item.decision_at)}</div>}
           </div>}
 
+          {item?.alert && <div style={{ marginTop: 18, fontSize: 11, color: item.alert.error || item.alert.failed?.length ? C.wn : C.tm, background: C.sf, border: `1px solid ${C.bdr}`, borderRadius: 10, padding: "8px 10px" }}>
+            <Ico t="chat" s={12} c={C.tm} /> WhatsApp alert {dtfmt(item.alert.at)}: {item.alert.error ? item.alert.error
+              : `sent to ${item.alert.sent.length} number${item.alert.sent.length === 1 ? "" : "s"}${item.alert.failed.length ? `, failed for ${item.alert.failed.map(x => x.phone).join(", ")}` : ""}`}
+          </div>}
+
           {!!item?.history?.length && <div style={{ marginTop: 18 }}>
             <div style={{ fontSize: 11, fontWeight: 600, color: C.td, textTransform: "uppercase", letterSpacing: ".05em", marginBottom: 6 }}>Audit trail</div>
             {[...item.history].reverse().map((h, i) => <div key={i} style={{ fontSize: 11, color: C.tm, padding: "3px 0" }}>{dtfmt(h.at)} · <strong style={{ color: C.tx }}>{h.by}</strong> {h.action} · <span style={{ color: STATUS[h.status]?.c }}>{STATUS[h.status]?.l}</span></div>)}
@@ -310,12 +316,25 @@ const SETTING_FIELDS = [
   ["repeat_minutes", "Repeat-weighing window (min)", "Same vehicle weighed again within this time is flagged"],
 ];
 export const SettingsModal = ({ settings, saveSettings, notify, onClose }) => {
-  const [f, , on] = useForm({ ...DEFAULT_SETTINGS, ...settings });
+  const [f, , on] = useForm({ ...DEFAULT_SETTINGS, alert_numbers: "", alert_on: "mismatch", ...settings });
   const [busy, run] = useSubmit(notify, onClose);
+  const [testing, setTesting] = useState(false);
+  const phones = String(f.alert_numbers || "").split(/[,;\n]+/).map(x => x.trim()).filter(Boolean);
+  const badPhones = phones.filter(p => { const d = p.replace(/\D/g, ""); return d.length < 10 || d.length > 15; });
   const submit = () => {
     const out = Object.fromEntries(SETTING_FIELDS.map(([k]) => [k, num(f[k])]));
     if (Object.values(out).some(x => x === "" || x < 0)) return notify("Every setting needs a number (0 or more)", "error");
-    run(() => saveSettings(out), "Settings saved — new slips use them");
+    if (badPhones.length) return notify(`Check this WhatsApp number: ${badPhones[0]}`, "error");
+    run(() => saveSettings({ ...out, alert_numbers: phones.join("\n"), alert_on: f.alert_on }), "Settings saved — new slips use them");
+  };
+  const test = async () => {
+    if (!phones.length) return notify("Add at least one WhatsApp number", "error");
+    setTesting(true);
+    try {
+      const r = await call("/weighbridge/alerts/test", { method: "POST", body: JSON.stringify({ numbers: phones.join(",") }) });
+      notify(r.failed.length ? `Sent to ${r.sent.length}; failed for ${r.failed.map(x => `${x.phone} (${x.error})`).join(", ")}` : `Test alert sent to ${r.sent.length} number${r.sent.length === 1 ? "" : "s"}`, r.failed.length ? "error" : "success");
+    } catch (e) { notify(e.message, "error"); }
+    setTesting(false);
   };
   return (
     <Modal w={620} title="Verification settings" onClose={onClose} footer={<><Btn onClick={onClose}>Cancel</Btn><Btn kind="primary" icon="check" onClick={submit} disabled={busy}>Save</Btn></>}>
@@ -326,6 +345,21 @@ export const SettingsModal = ({ settings, saveSettings, notify, onClose }) => {
         </Field>)}
       </Grid>
       <div style={{ fontSize: 11, color: C.td, marginTop: 14 }}>Changes apply to slips saved from now on. Open and save an older slip to re-check it with the new settings.</div>
+
+      <div style={{ marginTop: 22, borderTop: `1px solid ${C.bdr}`, paddingTop: 18 }}>
+        <SectionTitle>WhatsApp alerts (WATI)</SectionTitle>
+        <Grid min={260}>
+          <Field label="Send alerts to (one number per line)" span>
+            <textarea style={{ ...inp, minHeight: 80, resize: "vertical", borderColor: badPhones.length ? C.wn : C.bdr }} value={f.alert_numbers} onChange={on("alert_numbers")} placeholder={"98000 00001  (Boss)\n98000 00002  (Accounts)"} />
+            <span style={{ fontSize: 10, color: badPhones.length ? C.wn : C.td, display: "block", marginTop: 4 }}>{badPhones.length ? `Not a phone number: ${badPhones.join(", ")}` : "10-digit Indian numbers are fine; 91 is added automatically. Leave empty to send no alerts."}</span>
+          </Field>
+          <Field label="Send an alert when">
+            <select style={inp} value={f.alert_on} onChange={on("alert_on")}><Opts list={[["mismatch", "A slip is a Mismatch"], ["mismatch_review", "Mismatch or Needs review (more messages)"], ["off", "Never (alerts off)"]]} /></select>
+          </Field>
+          <div style={{ display: "flex", alignItems: "flex-end" }}><Btn icon="chat" onClick={test} disabled={testing}>{testing ? "Sending…" : "Send test alert"}</Btn></div>
+        </Grid>
+        <div style={{ fontSize: 11, color: C.td, marginTop: 10 }}>One message per slip when it becomes a mismatch — editing it again doesn't resend. The message uses the WhatsApp template approved in WATI.</div>
+      </div>
     </Modal>
   );
 };
